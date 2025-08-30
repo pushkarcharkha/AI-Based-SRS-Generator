@@ -18,6 +18,8 @@ function App() {
               <Route path="/upload" element={<UploadPage />} />
               <Route path="/generate" element={<GeneratePage />} />
               <Route path="/edit/:id?" element={<EditPage />} />
+              <Route path="/review" element={<ListPage />} />
+              <Route path="/review/:id" element={<EditPage />} />
               <Route path="/list" element={<ListPage />} />
             </Routes>
           </main>
@@ -33,7 +35,7 @@ function Header() {
   const navItems = [
     { path: '/upload', label: 'Upload Documents', icon: Upload },
     { path: '/generate', label: 'Generate Doc', icon: FileText },
-    { path: '/edit', label: 'Review/Edit', icon: Edit3 },
+    { path: '/review', label: 'Review/Edit', icon: Edit3 },
     { path: '/list', label: 'Export/List', icon: List },
   ];
 

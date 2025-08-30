@@ -331,226 +331,221 @@ function EditPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="flex flex-col h-screen bg-white dark:bg-gray-900">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1 min-w-0">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">Review & Edit Document</h2>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                <input
-                  value={title}
-                  onChange={(e) => {
-                    setTitle(e.target.value);
-                    setIsDirty(true);
-                  }}
-                  placeholder="Untitled Document"
-                  className="w-full sm:w-[420px] px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                />
-                <div className="flex items-center gap-2">
-                  <span className="text-xs uppercase tracking-wide px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
-                    {docType || 'Document'}
-                  </span>
-                  <select
-                    value={status}
-                    onChange={(e) => {
-                      setStatus(e.target.value as DocStatus);
-                      setIsDirty(true);
-                    }}
-                    className="text-sm px-2 py-1 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200"
-                  >
-                    <option value="draft">Draft</option>
-                    <option value="review">Review</option>
-                    <option value="final">Final</option>
-                  </select>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    {isDirty ? <span className="text-yellow-600 dark:text-yellow-400">• Unsaved</span> : lastUpdatedAt ? `Updated ${new Date(lastUpdatedAt).toLocaleString()}` : null}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              {/* View Mode Toggle */}
-              <div className="flex items-center rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-                <button
-                  onClick={() => setViewMode('edit')}
-                  className={`px-4 py-2 text-sm font-medium flex items-center space-x-2 ${
-                    viewMode === 'edit' 
-                      ? 'bg-blue-600 text-white' 
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  <Edit3 className="w-4 h-4" />
-                  <span>Editor</span>
-                </button>
-                <button
-                  onClick={() => setViewMode('preview')}
-                  className={`px-4 py-2 text-sm font-medium flex items-center space-x-2 border-l border-gray-200 dark:border-gray-700 ${
-                    viewMode === 'preview' 
-                      ? 'bg-blue-600 text-white' 
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  <Eye className="w-4 h-4" />
-                  <span>Preview</span>
-                </button>
-              </div>
-
-              {/* Action Buttons */}
+      <header className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={() => navigate('/list')}
+              className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+            >
+              ← Back to List
+            </button>
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">{title || 'Untitled Document'}</h1>
+            {lastUpdatedAt && (
+              <span className="text-sm text-gray-500 dark:text-gray-400">
+                Last saved: {new Date(lastUpdatedAt).toLocaleString()}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="flex border border-gray-300 dark:border-gray-600 rounded-md">
               <button
-                onClick={handleGeneralReview}
-                disabled={isReviewing || !effectiveDocId}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors disabled:opacity-50 flex items-center space-x-2"
+                onClick={() => setViewMode('edit')}
+                className={`px-3 py-1 text-sm ${
+                  viewMode === 'edit'
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200'
+                    : 'text-gray-700 dark:text-gray-300'
+                }`}
               >
-                {isReviewing ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <RefreshCw className="w-4 h-4" />
-                )}
-                <span>{isReviewing ? 'Reviewing...' : 'AI Review'}</span>
+                <Edit3 className="w-4 h-4 inline mr-1" />
+                Edit
               </button>
-
               <button
-                onClick={handleSave}
-                disabled={isSaving || !effectiveDocId}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:opacity-50"
+                onClick={() => setViewMode('preview')}
+                className={`px-3 py-1 text-sm ${
+                  viewMode === 'preview'
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200'
+                    : 'text-gray-700 dark:text-gray-300'
+                }`}
               >
-                <Save className="w-4 h-4" />
-                <span>{isSaving ? 'Saving...' : 'Save'}</span>
+                <Eye className="w-4 h-4 inline mr-1" />
+                Preview
               </button>
-
-              {saveMessage && (
-                <span className="text-sm text-green-600 dark:text-green-400">{saveMessage}</span>
-              )}
             </div>
+            <button
+              onClick={handleSave}
+              disabled={isSaving || !isDirty}
+              className={`px-3 py-1 text-sm font-medium rounded-md flex items-center ${
+                isSaving || !isDirty
+                  ? 'bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400 cursor-not-allowed'
+                  : 'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600'
+              }`}
+            >
+              {isSaving ? <RefreshCw className="w-4 h-4 mr-1 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
+              Save
+            </button>
           </div>
         </div>
-      </div>
+        {saveMessage && (
+          <div
+            className={`mt-2 p-2 text-sm rounded ${
+              saveMessage.includes('Error')
+                ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+            }`}
+          >
+            {saveMessage}
+          </div>
+        )}
+      </header>
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col">
-        {/* Document Editor or Preview - Full Screen */}
-        <div className="flex-1 bg-gray-50 dark:bg-gray-900 p-6">
-          <div className="max-w-7xl mx-auto h-full">
-            {viewMode === 'edit' ? (
-              <div className="h-full bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Document Editor</h3>
-                  <div className="text-sm text-gray-500 dark:text-gray-400">
-                    Markdown supported • Ctrl/Cmd + S to save
-                  </div>
-                </div>
-                <div className="h-[calc(100%-73px)]">
-                  <Editor
-                    height="600px"
-                    defaultLanguage="markdown"
-                    value={content}
-                    onChange={(value) => {
-                      setContent(value || '');
-                      setIsDirty(true);
-                    }}
-                    onMount={handleEditorDidMount}
-                    theme="vs-dark"
-                    options={{
-                      minimap: { enabled: false },
-                      fontSize: 14,
-                      lineNumbers: 'on',
-                      wordWrap: 'on',
-                      automaticLayout: true,
-                      scrollBeyondLastLine: false,
-                      padding: { top: 20, bottom: 20 },
-                    }}
-                  />
-                </div>
-              </div>
-            ) : (
-              <div className="h-full bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Live Preview</h3>
-                  <div className="text-sm text-gray-500 dark:text-gray-400">
-                    Rendered from Markdown
-                  </div>
-                </div>
-                <div className="h-[calc(100%-73px)] overflow-auto p-8">
-                  <div className="prose prose-lg dark:prose-invert max-w-none">
+      {/* Main Content */}
+      <main className="flex-1 overflow-hidden flex">
+        {isLoading ? (
+          <div className="h-full flex items-center justify-center w-full">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+          </div>
+        ) : loadError ? (
+          <div className="h-full flex items-center justify-center w-full">
+            <div className="text-red-500 dark:text-red-400 text-center">
+              <p className="text-xl font-semibold">Error Loading Document</p>
+              <p className="mt-2">{loadError}</p>
+              <button
+                onClick={() => navigate('/list')}
+                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                Return to Document List
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex w-full h-full">
+            {/* Document Editor - Left Side */}
+            <div className="flex-1 h-full overflow-hidden">
+              {viewMode === 'edit' ? (
+                <Editor
+                  height="100%"
+                  defaultLanguage="markdown"
+                  value={content}
+                  onChange={(value) => {
+                    setContent(value || '');
+                    setIsDirty(true);
+                  }}
+                  onMount={handleEditorDidMount}
+                  theme="vs-dark"
+                  options={{
+                    minimap: { enabled: false },
+                    wordWrap: 'on',
+                    lineNumbers: 'on',
+                    fontSize: 14,
+                    automaticLayout: true,
+                    scrollBeyondLastLine: false,
+                    padding: { top: 20, bottom: 20 },
+                  }}
+                />
+              ) : (
+                <div className="h-full overflow-auto p-6 bg-white dark:bg-gray-800">
+                  <div className="max-w-4xl mx-auto prose dark:prose-invert">
                     <ReactMarkdown>{content || '**No content to preview**\n\nStart editing to see your document here.'}</ReactMarkdown>
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
-        </div>
+              )}
+            </div>
 
-        {/* AI Assistant - Fixed Height Bottom Panel */}
-        <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
-          <div className="max-w-7xl mx-auto px-6 py-4">
-            <div className="flex flex-col h-80">
-              {/* Assistant Header */}
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="font-semibold text-gray-900 dark:text-white flex items-center">
+            {/* AI Chat Section - Right Side Panel */}
+            <div className="w-1/3 min-w-[300px] max-w-[500px] h-full flex flex-col bg-gray-50 dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 resize-x overflow-hidden">
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white flex items-center">
                   <MessageSquare className="w-5 h-5 mr-2" />
-                  AI Edit Assistant
-                </h4>
-                <div className="flex items-center space-x-3">
-                  <div className="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
-                    {status}
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    ID: {effectiveDocId?.slice(0, 8)}
-                  </div>
-                </div>
+                  AI Assistant
+                </h2>
+                <button
+                  onClick={handleGeneralReview}
+                  disabled={isReviewing || content.trim().length < 10}
+                  className={`px-3 py-1 text-sm font-medium rounded-md flex items-center ${
+                    isReviewing || content.trim().length < 10
+                      ? 'bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400 cursor-not-allowed'
+                      : 'bg-green-600 text-white hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600'
+                  }`}
+                >
+                  {isReviewing ? (
+                    <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4 mr-1" />
+                  )}
+                  Review
+                </button>
               </div>
 
               {/* Chat Messages */}
-              <div className="flex-1 bg-gray-50 dark:bg-gray-900 rounded-lg p-4 overflow-auto mb-4">
-                <div className="space-y-3">
-                  {chat.map((m) => (
-                    <div
-                      key={m.ts}
-                      className={`max-w-[85%] px-4 py-2 rounded-lg text-sm ${
-                        m.role === 'user'
-                          ? 'ml-auto bg-blue-600 text-white'
-                          : m.role === 'assistant'
-                          ? 'mr-auto bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700'
-                          : 'mx-auto bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 text-center'
-                      }`}
-                    >
-                      {m.text}
-                    </div>
-                  ))}
-                  <div ref={chatEndRef} />
-                </div>
+              <div className="flex-1 overflow-y-auto p-4">
+                {chat.length === 0 ? (
+                  <div className="text-center text-gray-500 dark:text-gray-400 h-full flex flex-col items-center justify-center">
+                    <MessageSquare className="w-8 h-8 mb-2 opacity-50" />
+                    <p>No messages yet. Ask the AI assistant for help or click "Review Document".</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {chat.map((msg, idx) => (
+                      <div
+                        key={idx}
+                        className={`flex ${
+                          msg.role === 'user' ? 'justify-end' : msg.role === 'system' ? 'justify-center' : 'justify-start'
+                        }`}
+                      >
+                        <div
+                          className={`max-w-3/4 rounded-lg p-3 ${
+                            msg.role === 'user'
+                              ? 'bg-blue-100 text-blue-900 dark:bg-blue-900 dark:text-blue-100'
+                              : msg.role === 'system'
+                              ? 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 text-sm italic'
+                              : 'bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-gray-100'
+                          }`}
+                        >
+                          <ReactMarkdown>{msg.text}</ReactMarkdown>
+                        </div>
+                      </div>
+                    ))}
+                    <div ref={chatEndRef} />
+                  </div>
+                )}
               </div>
 
               {/* Chat Input */}
-              <div className="flex items-center space-x-3">
-                <input
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleChatSubmit();
-                    }
-                  }}
-                  placeholder="Describe your edit... e.g., 'Tighten the Introduction and add Performance NFRs.'"
-                  className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-                <button
-                  onClick={handleChatSubmit}
-                  disabled={isReviewing || !chatInput.trim()}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center space-x-2 font-medium"
-                >
-                  <Send className="w-4 h-4" />
-                  <span>{isReviewing ? 'Applying...' : 'Apply'}</span>
-                </button>
+              <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleChatSubmit();
+                      }
+                    }}
+                    placeholder="Ask the AI assistant for help..."
+                    className="flex-1 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  />
+                  <button
+                    onClick={handleChatSubmit}
+                    disabled={chatInput.trim() === '' || isReviewing}
+                    className={`p-2 rounded-md ${
+                      chatInput.trim() === '' || isReviewing
+                        ? 'bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500 cursor-not-allowed'
+                        : 'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600'
+                    }`}
+                  >
+                    <Send className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
+        )}
+      </main>
     </div>
   );
 }

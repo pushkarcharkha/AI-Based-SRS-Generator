@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Edit3, Trash2, Search, Filter, Eye, X} from 'lucide-react';
+import { FileText, Edit3, Trash2, Search, Filter, Eye, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 // Define type for Vite's import.meta.env
@@ -139,7 +139,7 @@ function ListPage() {
   };
 
   const handleEdit = (docId: string) => {
-    navigate(`/edit/${docId}`);
+    navigate(`/review/${docId}`);
   };
 
   const handleDelete = async (docId: string) => {
@@ -350,16 +350,20 @@ function ListPage() {
                           >
                             PDF
                           </button>
-                          {(['DOCX', 'LaTeX'] as const).map((format) => (
-                            <button
-                              key={format}
-                              onClick={() => handleDownload(doc, format)}
-                              disabled={busyId === doc.id}
-                              className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
-                            >
-                              {format}
-                            </button>
-                          ))}
+                          <button
+                            onClick={() => handleDownload(doc, 'DOCX')}
+                            disabled={busyId === doc.id}
+                            className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
+                          >
+                            DOCX
+                          </button>
+                          <button
+                            onClick={() => handleDownload(doc, 'LaTeX')}
+                            disabled={busyId === doc.id}
+                            className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
+                          >
+                            LaTeX
+                          </button>
                         </div>
                       </div>
                     </div>

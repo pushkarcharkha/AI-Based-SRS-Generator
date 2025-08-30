@@ -206,7 +206,8 @@ class DocumentResponse(BaseModel):
     feedback_score: int  # RLHF feedback score
 
 class ReviewRequest(BaseModel):
-    document_id: str
+    document_id: Optional[str] = None
+    doc_id: Optional[str] = None  # Alternative field name for frontend compatibility
     content: str
     feedback: Optional[List[str]] = None
     feedback_score: Optional[int] = 3  # RLHF feedback score
@@ -238,14 +239,72 @@ async def options_review():
     """Handle OPTIONS requests for the review endpoint."""
     return {}
 
+@app.options("/api/review/{doc_id}")
+async def options_review_doc():
+    """Handle OPTIONS requests for the review document endpoint."""
+    return {}
+
+@app.post("/api/review/{doc_id}")
+async def review_document_by_id(doc_id: str, request: ReviewRequest = Body(...), db: Session = Depends(get_db)):
+    """Apply AI-based formatting improvements and optional feedback-driven edits to a specific document."""
+    try:
+        # Load document by ID
+        document = db.query(DBDocument).filter(DBDocument.id == doc_id).first()
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        content = request.content or document.content
+        if not content:
+            raise HTTPException(status_code=400, detail="No content provided for review")
+
+        review_agent = ReviewEditingAgent()
+        review_type = "both" if (request.feedback and len(request.feedback) > 0) else "formatting"
+        result = await review_agent.execute(
+            content=content,
+            doc_type=document.doc_type,
+            style_profile=document.style_metadata if document.style_metadata else {},
+            feedback=request.feedback or [],
+            review_type=review_type,
+            approved=False,
+            feedback_score=request.feedback_score or 3,
+            db_session=None,
+        )
+
+        if result.get("status") != "success":
+            raise HTTPException(status_code=500, detail=result.get("message", "Review failed"))
+
+        # Update document with improved content
+        document.content = result.get("improved_content", content)
+        document.updated_at = datetime.utcnow()
+        db.commit()
+
+        # Return fields the frontend can consume (supports both snake_case and camelCase)
+        return {
+            "status": "success",
+            "document_id": doc_id,
+            "improved_content": result.get("improved_content", content),
+            "improvedContent": result.get("improved_content", content),
+            "changes_made": result.get("changes_made", []),
+            "changesMade": result.get("changes_made", []),
+            "suggestions": [],
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Review endpoint failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/review")
 async def review_document(request: ReviewRequest, db: Session = Depends(get_db)):
     """Apply AI-based formatting improvements and optional feedback-driven edits."""
     try:
         # Load document if ID provided; otherwise operate on provided content only
         document = None
-        if request.document_id:
-            document = db.query(DBDocument).filter(DBDocument.id == request.document_id).first()
+        doc_id = request.document_id or request.doc_id
+        
+        if doc_id:
+            document = db.query(DBDocument).filter(DBDocument.id == doc_id).first()
             if not document:
                 raise HTTPException(status_code=404, detail="Document not found")
 
@@ -262,7 +321,7 @@ async def review_document(request: ReviewRequest, db: Session = Depends(get_db))
             feedback=request.feedback or [],
             review_type=review_type,
             approved=False,
-            feedback_score=3,
+            feedback_score=request.feedback_score or 3,
             db_session=None,
         )
 
@@ -272,6 +331,9 @@ async def review_document(request: ReviewRequest, db: Session = Depends(get_db))
         # Return fields the frontend can consume (supports both snake_case and camelCase)
         return {
             "status": "success",
+            "doc_id": doc_id,
+            "document_id": doc_id,
+            "updated_content": result.get("improved_content", content),
             "improved_content": result.get("improved_content", content),
             "improvedContent": result.get("improved_content", content),
             "changes_made": result.get("changes_made", []),
@@ -285,20 +347,18 @@ async def review_document(request: ReviewRequest, db: Session = Depends(get_db))
         logger.error(f"Review endpoint failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# FastAPI App
-app = FastAPI(
-    title="Agentic RAG Tool API",
-    description="Multi-agent document generation system with Langchain and Langgraph",
-    version="1.0.0"
-)
+# Note: FastAPI App is already initialized above, no need to reinitialize
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Vite dev server
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Add alias routes for /api/docs endpoints
+@app.get("/api/docs")
+async def get_all_documents(db: Session = Depends(get_db)):
+    """Get all documents - alias for /api/documents."""
+    return await list_documents(db)
+
+@app.get("/api/docs/{doc_id}")
+async def get_document_by_id(doc_id: str, db: Session = Depends(get_db)):
+    """Get a document by ID - alias for /api/documents/{document_id}."""
+    return await get_document(doc_id, db)
 
 # Initialize database and validate
 create_tables()
@@ -386,8 +446,11 @@ async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db
 
         # Create temp file
         with tempfile.NamedTemporaryFile(delete=False) as temp_file:
-            await aiofiles.open(temp_file.name, mode='wb').write(content)
             temp_path = Path(temp_file.name)
+            
+        # Use aiofiles correctly with async with
+        async with aiofiles.open(temp_path, mode='wb') as f:
+            await f.write(content)
 
         # Process with ingestion agent
         agent = DocumentIngestionAgent()
