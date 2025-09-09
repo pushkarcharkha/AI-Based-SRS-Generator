@@ -371,6 +371,40 @@ class DocumentIngestionAgent(BaseAgent):
         wait=tenacity.wait_exponential(multiplier=1, min=4, max=10),
         retry=tenacity.retry_if_exception_type(Exception)
     )
+    def _create_latex_header_file(self) -> str:
+        """Create a temporary file with LaTeX header configurations for Unicode support"""
+        import tempfile
+        import os
+        
+        # Create a temporary file for the LaTeX header
+        fd, path = tempfile.mkstemp(suffix='.tex')
+        
+        # LaTeX header content with Unicode configuration
+        header_content = r'''
+\usepackage{fontspec}
+\usepackage{unicode-math}
+\usepackage{microtype}
+\usepackage{xeCJK}
+\usepackage{ucharclasses}
+\usepackage{listings}
+\usepackage{textcomp}
+
+% Ensure proper dash handling
+\DeclareUnicodeCharacter{2013}{--}  % en-dash
+\DeclareUnicodeCharacter{2014}{---} % em-dash
+\DeclareUnicodeCharacter{2022}{\textbullet} % bullet
+\DeclareUnicodeCharacter{2023}{\textbullet} % triangular bullet
+
+% Configure font features for better Unicode support
+\defaultfontfeatures{Ligatures=TeX, Scale=MatchLowercase}
+'''
+        
+        # Write the header content to the temporary file
+        with os.fdopen(fd, 'w') as f:
+            f.write(header_content)
+        
+        return path
+    
     async def export_document(self, db: Session, document_id: str, format: str = "md") -> bytes:
         """Export document in specified format"""
         try:
@@ -379,7 +413,15 @@ class DocumentIngestionAgent(BaseAgent):
             if not document:
                 raise ValueError("Document not found")
             
-            content = document.content.encode('utf-8')
+            # Ensure proper Unicode handling for special characters like dashes
+            # Replace problematic dash characters with their proper Unicode equivalents
+            processed_content = document.content
+            # Replace en-dash and em-dash with their proper Unicode representations
+            processed_content = processed_content.replace('–', '\u2013').replace('—', '\u2014')
+            # Replace hyphen-minus with proper hyphen
+            processed_content = processed_content.replace('-', '\u002D')
+            # Replace other potentially problematic characters if needed
+            content = processed_content.encode('utf-8')
             
             if format == "md":
                 return content
@@ -389,21 +431,55 @@ class DocumentIngestionAgent(BaseAgent):
                     import subprocess
                     to_format = "latex" if format == "latex" else format
                     
-                    proc = await asyncio.create_subprocess_exec(
-                        'pandoc', '-f', 'markdown', '-t', to_format,
-                        stdin=asyncio.subprocess.PIPE, 
-                        stdout=asyncio.subprocess.PIPE,
-                        stderr=asyncio.subprocess.PIPE
-                    )
+                    # Configure Pandoc to use XeLaTeX with Unicode font support for PDF
+                    pandoc_args = ['pandoc', '-f', 'markdown', '-t', to_format]
+                    header_file_path = None
                     
-                    stdout, stderr = await proc.communicate(content)
-                    return_code = await proc.wait()
+                    # For PDF, use XeLaTeX with Unicode font support
+                    if format == "pdf":
+                        # Use a list of common Unicode-compatible fonts that work across platforms
+                        # The first available font in the list will be used
+                        header_file_path = self._create_latex_header_file()
+                        pandoc_args.extend([
+                            '--pdf-engine=xelatex',
+                            # Try multiple fonts in order of preference
+                            # Windows fonts first, then cross-platform fonts
+                            '-V', 'mainfont=Arial, Calibri, Times New Roman, Liberation Serif, DejaVu Sans, Noto Sans, Segoe UI',
+                            '-V', 'sansfont=Arial, Calibri, Segoe UI, Liberation Sans, DejaVu Sans, Noto Sans',
+                            '-V', 'monofont=Consolas, Courier New, Liberation Mono, DejaVu Sans Mono',
+                            '--variable=fontsize:11pt',
+                            # Add variables to ensure proper Unicode handling
+                            '-V', 'geometry:margin=1in',
+                            '-V', 'documentclass=article',
+                            # Use the custom LaTeX template with proper font configuration
+                            '--include-in-header=' + header_file_path
+                        ])
                     
-                    if return_code != 0:
-                        error_msg = stderr.decode('utf-8') if stderr else "Unknown pandoc error"
-                        raise RuntimeError(f"Pandoc conversion failed: {error_msg}")
-                    
-                    return stdout
+                    try:
+                        proc = await asyncio.create_subprocess_exec(
+                            *pandoc_args,
+                            stdin=asyncio.subprocess.PIPE, 
+                            stdout=asyncio.subprocess.PIPE,
+                            stderr=asyncio.subprocess.PIPE
+                        )
+                        
+                        stdout, stderr = await proc.communicate(content)
+                        return_code = await proc.wait()
+                        
+                        if return_code != 0:
+                            error_msg = stderr.decode('utf-8') if stderr else "Unknown pandoc error"
+                            raise RuntimeError(f"Pandoc conversion failed: {error_msg}")
+                        
+                        return stdout
+                    finally:
+                        # Clean up the temporary header file if it was created
+                        if header_file_path and os.path.exists(header_file_path):
+                            try:
+                                os.remove(header_file_path)
+                                logger.debug(f"Removed temporary LaTeX header file: {header_file_path}")
+                            except Exception as e:
+                                logger.warning(f"Failed to remove temporary file {header_file_path}: {e}")
+
                     
                 except FileNotFoundError:
                     # If pandoc is not available, return markdown

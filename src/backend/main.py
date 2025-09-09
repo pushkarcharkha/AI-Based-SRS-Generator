@@ -56,6 +56,9 @@ def _markdown_to_latex(markdown_content, title):
         "\\usepackage{color}",
         "\\usepackage{enumitem}",
         "\\usepackage{booktabs}",
+        "\\usepackage{textcomp}",
+        "\\DeclareUnicodeCharacter{2013}{--}",  # en-dash
+        "\\DeclareUnicodeCharacter{2014}{---}", # em-dash
         "",
         "\\title{" + title.replace("_", "\\_") + "}",
         "\\author{}",
@@ -136,6 +139,11 @@ def _markdown_to_latex(markdown_content, title):
             formatted_line = line.replace("**", "\\textbf{").replace("**", "}")
             formatted_line = formatted_line.replace("*", "\\textit{").replace("*", "}")
             formatted_line = formatted_line.replace("_", "\\_")
+            # Properly handle dashes
+            formatted_line = formatted_line.replace(" - ", " -- ")
+            formatted_line = formatted_line.replace("-", "\\textendash{}")
+            formatted_line = formatted_line.replace("--", "\\textendash{}")
+            formatted_line = formatted_line.replace("---", "\\textemdash{}")
             latex.append(formatted_line)
         
         # Add empty lines
@@ -673,8 +681,14 @@ async def export_document(document_id: str, format: str = "md", db: Session = De
                 try:
                     from xhtml2pdf import pisa
                     
-                    # Convert Markdown to HTML
-                    html_content = markdown2.markdown(content, extras=["tables", "fenced-code-blocks"])
+                    # Pre-process content to ensure proper dash rendering
+                    processed_content = content
+                    # Ensure proper dash rendering by using HTML entities
+                    processed_content = processed_content.replace(" - ", " – ")
+                    processed_content = processed_content.replace("--", "—")
+                    
+                    # Convert Markdown to HTML with proper symbol handling
+                    html_content = markdown2.markdown(processed_content, extras=["tables", "fenced-code-blocks"])
                     html = f"""
                     <html>
                     <head>
@@ -716,8 +730,14 @@ async def export_document(document_id: str, format: str = "md", db: Session = De
                     # Fall back to weasyprint if xhtml2pdf is not available
                     from weasyprint import HTML as WeasyHTML
                     
-                    # Convert Markdown to HTML
-                    html_content = markdown2.markdown(content, extras=["tables", "fenced-code-blocks"])
+                    # Pre-process content to ensure proper dash rendering
+                    processed_content = content
+                    # Ensure proper dash rendering by using Unicode characters
+                    processed_content = processed_content.replace(" - ", " – ")
+                    processed_content = processed_content.replace("--", "—")
+                    
+                    # Convert Markdown to HTML with proper symbol handling
+                    html_content = markdown2.markdown(processed_content, extras=["tables", "fenced-code-blocks"])
                     html = f"""
                     <html>
                     <head>
@@ -764,7 +784,14 @@ async def export_document(document_id: str, format: str = "md", db: Session = De
                 
                 # Create a temporary markdown file
                 md_file = tempfile.NamedTemporaryFile(delete=False, suffix=".md")
-                md_file.write(content.encode('utf-8'))
+                
+                # Pre-process content to ensure proper dash rendering
+                processed_content = content
+                # Ensure proper dash rendering by using HTML entities
+                processed_content = processed_content.replace(" - ", " – ")
+                processed_content = processed_content.replace("--", "—")
+                
+                md_file.write(processed_content.encode('utf-8'))
                 md_file.close()
                 
                 # Create output docx file
@@ -773,7 +800,9 @@ async def export_document(document_id: str, format: str = "md", db: Session = De
                 
                 # Convert using pandoc
                 try:
-                    pypandoc.convert_file(md_file.name, 'docx', outputfile=docx_file.name)
+                    # Use extra_args to ensure proper Unicode handling
+                    pypandoc.convert_file(md_file.name, 'docx', outputfile=docx_file.name, 
+                                         extra_args=['--ascii'])
                     os.unlink(md_file.name)  # Clean up the temp markdown file
                     
                     return FileResponse(
@@ -788,8 +817,8 @@ async def export_document(document_id: str, format: str = "md", db: Session = De
                     doc = Document()
                     doc.add_heading(title, 0)
                     
-                    # Simple markdown parsing for docx (basic implementation)
-                    paragraphs = content.split('\n\n')
+                    # Enhanced markdown parsing for docx with proper symbol handling
+                    paragraphs = processed_content.split('\n\n')
                     for para in paragraphs:
                         if para.startswith('# '):
                             doc.add_heading(para[2:], 1)
@@ -797,6 +826,11 @@ async def export_document(document_id: str, format: str = "md", db: Session = De
                             doc.add_heading(para[3:], 2)
                         elif para.startswith('### '):
                             doc.add_heading(para[4:], 3)
+                        elif para.startswith('- ') or para.startswith('* '):
+                            # Handle list items
+                            p = doc.add_paragraph()
+                            p.style = 'List Bullet'
+                            p.add_run(para[2:])
                         else:
                             doc.add_paragraph(para)
                     

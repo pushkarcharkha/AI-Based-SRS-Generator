@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import Editor from '@monaco-editor/react';
 import { Save, MessageSquare, RefreshCw, Send, Eye, Edit3 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+
+// Monaco Editor import
+import MonacoEditor from '../components/MonacoEditor';
 
 type DocStatus = 'draft' | 'review' | 'final';
 type ViewMode = 'edit' | 'preview';
@@ -41,13 +43,317 @@ type DocumentListItem = {
 
 type ChatMsg = { role: 'user' | 'assistant' | 'system'; text: string; ts: number };
 
-// Type for Monaco Editor instance
-type MonacoEditor = {
-  focus: () => void;
-  getValue: () => string;
-  setValue: (value: string) => void;
-  // Add other Monaco editor methods as needed
-} | null;
+// Custom styles for TipTap editor
+const editorStyles = {
+  '.ProseMirror': {
+    height: '100%',
+    padding: '24px',
+    outline: 'none',
+    fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+    fontSize: '16px',
+    lineHeight: '1.6',
+    color: '#333',
+    backgroundColor: '#fff',
+    overflowY: 'auto',
+    boxShadow: 'inset 0 0 0 1px rgba(0, 0, 0, 0.05)',
+  },
+  '.dark .ProseMirror': {
+    color: '#e0e0e0',
+    backgroundColor: '#1e1e1e',
+    boxShadow: 'inset 0 0 0 1px rgba(255, 255, 255, 0.05)',
+  },
+  '.ProseMirror p': {
+    marginBottom: '1.2em',
+  },
+  '.ProseMirror h1, .ProseMirror h2, .ProseMirror h3, .ProseMirror h4, .ProseMirror h5, .ProseMirror h6': {
+    fontWeight: '600',
+    lineHeight: '1.25',
+    marginTop: '1.5em',
+    marginBottom: '0.75em',
+    color: '#111',
+  },
+  '.dark .ProseMirror h1, .dark .ProseMirror h2, .dark .ProseMirror h3, .dark .ProseMirror h4, .dark .ProseMirror h5, .dark .ProseMirror h6': {
+    color: '#f3f3f3',
+  },
+  '.ProseMirror h1': { 
+    fontSize: '2em', 
+    borderBottom: '1px solid #eee', 
+    paddingBottom: '0.3em',
+    marginTop: '0.5em',
+  },
+  '.ProseMirror h2': { 
+    fontSize: '1.5em', 
+    borderBottom: '1px solid #eee', 
+    paddingBottom: '0.2em',
+    marginTop: '1.2em',
+  },
+  '.ProseMirror h3': { fontSize: '1.3em' },
+  '.ProseMirror h4': { fontSize: '1.2em' },
+  '.ProseMirror h5': { fontSize: '1.1em' },
+  '.ProseMirror h6': { fontSize: '1em', color: '#555' },
+  '.dark .ProseMirror h1, .dark .ProseMirror h2': { borderBottom: '1px solid #333' },
+  '.dark .ProseMirror h6': { color: '#aaa' },
+  '.ProseMirror ul, .ProseMirror ol': {
+    paddingLeft: '1.5em',
+    marginBottom: '1.2em',
+  },
+  '.ProseMirror ul': {
+    listStyleType: 'disc',
+  },
+  '.ProseMirror ol': {
+    listStyleType: 'decimal',
+  },
+  '.ProseMirror li': {
+    marginBottom: '0.5em',
+    position: 'relative',
+  },
+  '.ProseMirror li p': {
+    marginBottom: '0.5em',
+  },
+  '.ProseMirror blockquote': {
+    borderLeft: '4px solid #ddd',
+    paddingLeft: '1.2em',
+    fontStyle: 'italic',
+    marginLeft: '0',
+    marginRight: '0',
+    marginBottom: '1.2em',
+    color: '#555',
+    backgroundColor: 'rgba(0, 0, 0, 0.02)',
+    borderRadius: '0 4px 4px 0',
+    padding: '0.5em 1.2em 0.5em 1.2em',
+  },
+  '.dark .ProseMirror blockquote': {
+    borderLeft: '4px solid #444',
+    color: '#aaa',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+  },
+  '.ProseMirror code': {
+    fontFamily: '"SF Mono", Monaco, Menlo, Consolas, "Ubuntu Mono", monospace',
+    backgroundColor: 'rgba(97, 97, 97, 0.1)',
+    borderRadius: '3px',
+    padding: '0.2em 0.4em',
+    fontSize: '0.9em',
+    color: '#e83e8c',
+  },
+  '.dark .ProseMirror code': {
+    color: '#f06595',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  '.ProseMirror pre': {
+    backgroundColor: '#f6f8fa',
+    borderRadius: '5px',
+    padding: '0.7em 1em',
+    marginBottom: '1.2em',
+    overflowX: 'auto',
+    border: '1px solid #e1e4e8',
+  },
+  '.dark .ProseMirror pre': {
+    backgroundColor: '#2d333b',
+    border: '1px solid #444c56',
+  },
+  '.ProseMirror pre code': {
+    backgroundColor: 'transparent',
+    padding: '0',
+    fontSize: '0.9em',
+    lineHeight: '1.5',
+    color: '#333',
+  },
+  '.dark .ProseMirror pre code': {
+    color: '#e0e0e0',
+  },
+  '.ProseMirror mark': {
+    backgroundColor: 'rgba(255, 212, 0, 0.5)',
+    borderRadius: '3px',
+    padding: '0.1em 0.3em',
+  },
+  '.ProseMirror a': {
+    color: '#0074d9',
+    textDecoration: 'underline',
+  },
+  '.dark .ProseMirror a': {
+    color: '#3b9cff',
+  },
+  '.ProseMirror hr': {
+    border: 'none',
+    borderTop: '2px solid rgba(97, 97, 97, 0.1)',
+    margin: '2em 0',
+  },
+  '.ProseMirror table': {
+    borderCollapse: 'collapse',
+    marginBottom: '1.2em',
+    width: '100%',
+    tableLayout: 'fixed',
+    overflow: 'hidden',
+    borderRadius: '4px',
+    border: '1px solid #ddd',
+  },
+  '.dark .ProseMirror table': {
+    border: '1px solid #444',
+  },
+  '.ProseMirror table td, .ProseMirror table th': {
+    border: '1px solid #ddd',
+    padding: '0.5em',
+    verticalAlign: 'top',
+    position: 'relative',
+    minWidth: '75px',
+  },
+  '.dark .ProseMirror table td, .dark .ProseMirror table th': {
+    border: '1px solid #444',
+  },
+  '.ProseMirror table th': {
+    backgroundColor: '#f5f5f5',
+    fontWeight: 'bold',
+    textAlign: 'left',
+  },
+  '.dark .ProseMirror table th': {
+    backgroundColor: '#333',
+  },
+  '.ProseMirror table tr:nth-child(even)': {
+    backgroundColor: '#f9f9f9',
+  },
+  '.dark .ProseMirror table tr:nth-child(even)': {
+    backgroundColor: '#2a2a2a',
+  },
+  '.ProseMirror .resize-cursor': {
+    cursor: 'col-resize',
+    position: 'absolute',
+    right: '-2px',
+    top: 0,
+    bottom: 0,
+    width: '4px',
+    backgroundColor: '#0074d9',
+    opacity: '0.5',
+  },
+  '.ProseMirror .selectedCell': {
+    backgroundColor: 'rgba(200, 200, 255, 0.4)',
+  },
+  '.dark .ProseMirror .selectedCell': {
+    backgroundColor: 'rgba(100, 100, 155, 0.4)',
+  },
+  '.ProseMirror .tableWrapper': {
+    overflow: 'auto',
+    marginBottom: '1.2em',
+    padding: '0.5em',
+    backgroundColor: 'rgba(0, 0, 0, 0.02)',
+    borderRadius: '4px',
+  },
+  '.dark .ProseMirror .tableWrapper': {
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+  },
+  '.ProseMirror .markdown-table': {
+    margin: '0 auto',
+    overflow: 'hidden',
+    borderRadius: '4px',
+  },
+  // Task list styles
+  '.ProseMirror ul[data-type="taskList"]': {
+    listStyleType: 'none',
+    padding: 0,
+    marginBottom: '1.2em',
+  },
+  '.ProseMirror ul[data-type="taskList"] li': {
+    display: 'flex',
+    alignItems: 'flex-start',
+    marginBottom: '0.5em',
+  },
+  '.ProseMirror ul[data-type="taskList"] li > label': {
+    flexShrink: 0,
+    marginRight: '0.5em',
+    userSelect: 'none',
+  },
+  '.ProseMirror ul[data-type="taskList"] li > div': {
+    flex: 1,
+  },
+  '.ProseMirror ul[data-type="taskList"] input[type="checkbox"]': {
+    cursor: 'pointer',
+    margin: '0.2em 0.5em 0 0',
+  },
+  '.ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div': {
+    textDecoration: 'line-through',
+    color: '#999',
+  },
+  '.dark .ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div': {
+    color: '#777',
+  },
+  
+  // Code block styles
+  '.ProseMirror .code-block': {
+    backgroundColor: '#f6f8fa',
+    borderRadius: '5px',
+    padding: '0.7em 1em',
+    marginBottom: '1.2em',
+    overflowX: 'auto',
+    border: '1px solid #e1e4e8',
+    fontFamily: '"SF Mono", Monaco, Menlo, Consolas, "Ubuntu Mono", monospace',
+    fontSize: '0.9em',
+    lineHeight: '1.5',
+  },
+  '.dark .ProseMirror .code-block': {
+    backgroundColor: '#2d333b',
+    border: '1px solid #444c56',
+    color: '#e0e0e0',
+  },
+  
+  // Enhanced diff styles
+  '.ProseMirror .diff-removed': {
+    backgroundColor: 'rgba(255, 0, 0, 0.15)',
+    textDecoration: 'line-through',
+    padding: '0.1em 0.3em',
+    borderRadius: '3px',
+    color: '#b71c1c',
+    display: 'inline-block',
+    margin: '0 2px',
+  },
+  '.dark .ProseMirror .diff-removed': {
+    backgroundColor: 'rgba(255, 0, 0, 0.2)',
+    color: '#ff6b6b',
+  },
+  '.ProseMirror .diff-added': {
+    backgroundColor: 'rgba(0, 200, 0, 0.15)',
+    padding: '0.1em 0.3em',
+    borderRadius: '3px',
+    color: '#1b5e20',
+    display: 'inline-block',
+    margin: '0 2px',
+    fontWeight: '500',
+  },
+  '.dark .ProseMirror .diff-added': {
+    backgroundColor: 'rgba(0, 200, 0, 0.2)',
+    color: '#4caf50',
+  },
+  '.ProseMirror .removed-content': {
+    marginBottom: '1.5em',
+    padding: '1em',
+    borderRadius: '5px',
+    backgroundColor: 'rgba(255, 0, 0, 0.05)',
+    border: '1px solid rgba(255, 0, 0, 0.2)',
+  },
+  '.dark .ProseMirror .removed-content': {
+    backgroundColor: 'rgba(255, 0, 0, 0.1)',
+    border: '1px solid rgba(255, 0, 0, 0.3)',
+  },
+  '.ProseMirror .removed-content h4': {
+    marginTop: '0',
+    color: '#b71c1c',
+    fontSize: '1em',
+    fontWeight: '600',
+  },
+  '.dark .ProseMirror .removed-content h4': {
+    color: '#ff6b6b',
+  },
+  '.ProseMirror .diff-section': {
+    borderLeft: '3px solid #0074d9',
+    paddingLeft: '1em',
+    marginBottom: '1.5em',
+    backgroundColor: 'rgba(0, 116, 217, 0.05)',
+    borderRadius: '0 4px 4px 0',
+    padding: '0.5em 1em',
+  },
+  '.dark .ProseMirror .diff-section': {
+    borderLeft: '3px solid #3b9cff',
+    backgroundColor: 'rgba(59, 156, 255, 0.05)',
+  },
+};
 
 function EditPage() {
   const params = useParams();
@@ -76,10 +382,29 @@ function EditPage() {
   const [isDirty, setIsDirty] = useState<boolean>(false);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string>('');
 
-  const editorRef = useRef<MonacoEditor>(null);
-  const handleEditorDidMount = (editor: MonacoEditor) => {
-    editorRef.current = editor;
+  // Handle content changes from Monaco Editor
+  const handleEditorChange = (newContent: string) => {
+    setContent(newContent);
+    setIsDirty(true);
   };
+  
+  // Get the current theme based on system preference
+  const [editorTheme, setEditorTheme] = useState<'vs-dark' | 'light'>('vs-dark');
+  
+  // Detect system theme preference
+  useEffect(() => {
+    const darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const updateTheme = (e: MediaQueryListEvent | MediaQueryList) => {
+      setEditorTheme(e.matches ? 'vs-dark' : 'light');
+    };
+    
+    // Set initial theme
+    updateTheme(darkModeMediaQuery);
+    
+    // Listen for theme changes
+    darkModeMediaQuery.addEventListener('change', updateTheme);
+    return () => darkModeMediaQuery.removeEventListener('change', updateTheme);
+  }, []);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -168,17 +493,27 @@ function EditPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
 
+  // Function to normalize dashes for export
+  const normalizeDashes = (text: string): string => {
+    return text
+      .replace(/[–—−■]/g, '-') // Replace various dash types with standard ASCII dash
+      .replace(/[•]/g, '*');    // Replace bullet points with asterisk
+  };
+  
   const handleSave = async () => {
     if (!effectiveDocId) return;
     setIsSaving(true);
     setSaveMessage(null);
     try {
+      // Normalize dashes before saving
+      const normalizedContent = normalizeDashes(content);
+      
       const res = await fetch(`${API_BASE}/api/documents/${effectiveDocId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title,
-          content,
+          content: normalizedContent,
           status,
         }),
       });
@@ -209,12 +544,15 @@ function EditPage() {
     if (!effectiveDocId) return;
     setIsReviewing(true);
     try {
+      // Normalize dashes before sending to API
+      const normalizedContent = normalizeDashes(content);
+      
       const res = await fetch(`${API_BASE}/api/review`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           document_id: effectiveDocId,
-          content,
+          content: normalizedContent,
           feedback: feedbackList && feedbackList.length ? feedbackList : undefined,
         }),
       });
@@ -231,19 +569,136 @@ function EditPage() {
       }
 
       const data: ReviewAgentResponse = await res.json();
-      const improved = data.improved_content || data.improvedContent || '';
+      let improved = data.improved_content || data.improvedContent || '';
 
+      // Create a detailed summary with diff information
+      let summary = '';
+      
+      // Check if we have diff details
+      if ('diff_details' in data) {
+        const diff = (data as any).diff_details;
+        summary = '### Changes Applied\n\n';
+        
+        // Process content with visual diff highlighting
+        if ((diff.added && diff.added.length > 0) || (diff.removed && diff.removed.length > 0)) {
+          // Start with the original content
+          let processedContent = improved || content;
+          
+          // Create a diff section to wrap all changes
+          let diffSectionStart = '<div class="diff-section"><h4>AI Modifications:</h4>';
+          let diffSectionEnd = '</div>';
+          
+          // Define modification type
+          interface Modification {
+            type: 'added' | 'removed';
+            text: string;
+            html: string;
+            regex?: RegExp;
+          }
+          
+          // Track all modifications for better display
+          let modifications: Modification[] = [];
+          
+          // Process removals first
+          if (diff.removed && diff.removed.length > 0) {
+            // Add to summary markdown for the chat
+            summary += '#### Removed Content\n```diff\n';
+            diff.removed.forEach((line: string) => {
+              summary += `- ${line}\n`;
+              
+              // Add to modifications for visual display
+              modifications.push({
+                type: 'removed',
+                text: line,
+                html: `<span class="diff-removed">${line}</span>`
+              });
+            });
+            summary += '```\n\n';
+          }
+          
+          // Process additions
+          if (diff.added && diff.added.length > 0) {
+            // Add to summary markdown for the chat
+            summary += '#### Added Content\n```diff\n';
+            diff.added.forEach((line: string) => {
+              summary += `+ ${line}\n`;
+              
+              // Escape special regex characters to avoid issues
+              const escapedLine = line.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              
+              // Add to modifications for visual display
+              modifications.push({
+                type: 'added',
+                text: line,
+                regex: new RegExp(escapedLine, 'g'),
+                html: `<span class="diff-added">${line}</span>`
+              });
+            });
+            summary += '```\n\n';
+          }
+          
+          // Apply all modifications to the content
+          // First, handle removals by adding them to the diff section
+          let removalsHtml = '';
+          modifications
+            .filter(mod => mod.type === 'removed')
+            .forEach(mod => {
+              removalsHtml += `<p>${mod.html}</p>`;
+            });
+          
+          // Then, handle additions by replacing them in the content
+          modifications
+            .filter(mod => mod.type === 'added' && mod.regex !== undefined)
+            .forEach(mod => {
+              // We've already filtered for mods with regex
+              processedContent = processedContent.replace(
+                mod.regex as RegExp,
+                mod.html
+              );
+            });
+          
+          // Combine everything into the final content with diff highlighting
+          if (removalsHtml) {
+            diffSectionStart += removalsHtml;
+          }
+          
+          // Insert the diff section at the beginning of the document
+          processedContent = diffSectionStart + diffSectionEnd + processedContent;
+          
+          // Update the improved content with highlighted diffs
+          improved = processedContent;
+        }
+        
+        // Add summary if available
+        if (diff.summary && diff.summary.length > 0) {
+          summary += `#### Summary\n${diff.summary.join('\n')}\n`;
+        }
+      } else {
+        // Fallback to the old summary format if no diff details
+        const changesMade = data.changes_made || data.changesMade || [];
+        if (changesMade.length) {
+          summary = `### ${changesMade.length} Improvement${changesMade.length > 1 ? 's' : ''} Applied\n\n`;
+          summary += '```diff\n';
+          changesMade.forEach((change: string) => {
+            summary += `+ ${change}\n`;
+          });
+          summary += '```\n\n';
+        } else {
+          summary = data.message || '### Changes Applied';
+        }
+        
+        if (data.suggestions && data.suggestions.length) {
+          summary += `\n\n#### Suggestions for Further Improvement\n`;
+          data.suggestions.forEach((suggestion: string) => {
+            summary += `- ${suggestion}\n`;
+          });
+        }
+      }
+
+      // Apply the improved content with diff highlighting
       if (improved) {
         setContent(improved);
       }
-
-      const summary =
-        (data.changes_made && data.changes_made.length
-          ? `Applied ${data.changes_made.length} improvement(s).`
-          : data.changesMade && data.changesMade.length
-          ? `Applied ${data.changesMade.length} improvement(s).`
-          : data.message || 'Changes applied.') +
-        (data.suggestions && data.suggestions.length ? ` Suggestions: ${data.suggestions.join('; ')}` : '');
 
       // Append bot note
       setChat((prev) => [
@@ -333,30 +788,33 @@ function EditPage() {
   return (
     <div className="flex flex-col h-screen bg-white dark:bg-gray-900">
       {/* Header */}
-      <header className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+      <header className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <button
               onClick={() => navigate('/list')}
-              className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+              className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors duration-200 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+              aria-label="Back to List"
             >
               ← Back to List
             </button>
-            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">{title || 'Untitled Document'}</h1>
-            {lastUpdatedAt && (
-              <span className="text-sm text-gray-500 dark:text-gray-400">
-                Last saved: {new Date(lastUpdatedAt).toLocaleString()}
-              </span>
-            )}
+            <div>
+              <h1 className="text-xl font-semibold text-gray-900 dark:text-white truncate max-w-md">{title || 'Untitled Document'}</h1>
+              {lastUpdatedAt && (
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  Last saved: {new Date(lastUpdatedAt).toLocaleString()}
+                </span>
+              )}
+            </div>
           </div>
-          <div className="flex items-center space-x-2">
-            <div className="flex border border-gray-300 dark:border-gray-600 rounded-md">
+          <div className="flex items-center space-x-3">
+            <div className="flex border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden shadow-sm">
               <button
                 onClick={() => setViewMode('edit')}
-                className={`px-3 py-1 text-sm ${
+                className={`px-3 py-1.5 text-sm font-medium transition-colors duration-200 ${
                   viewMode === 'edit'
-                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200'
-                    : 'text-gray-700 dark:text-gray-300'
+                    ? 'bg-blue-500 text-white'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
               >
                 <Edit3 className="w-4 h-4 inline mr-1" />
@@ -364,10 +822,10 @@ function EditPage() {
               </button>
               <button
                 onClick={() => setViewMode('preview')}
-                className={`px-3 py-1 text-sm ${
+                className={`px-3 py-1.5 text-sm font-medium transition-colors duration-200 ${
                   viewMode === 'preview'
-                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200'
-                    : 'text-gray-700 dark:text-gray-300'
+                    ? 'bg-blue-500 text-white'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
               >
                 <Eye className="w-4 h-4 inline mr-1" />
@@ -377,7 +835,7 @@ function EditPage() {
             <button
               onClick={handleSave}
               disabled={isSaving || !isDirty}
-              className={`px-3 py-1 text-sm font-medium rounded-md flex items-center ${
+              className={`px-3 py-1.5 text-sm font-medium rounded-lg flex items-center shadow-sm transition-colors duration-200 ${
                 isSaving || !isDirty
                   ? 'bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400 cursor-not-allowed'
                   : 'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600'
@@ -390,7 +848,7 @@ function EditPage() {
         </div>
         {saveMessage && (
           <div
-            className={`mt-2 p-2 text-sm rounded ${
+            className={`mt-2 p-2 text-sm rounded-lg font-medium transition-all duration-300 ${
               saveMessage.includes('Error')
                 ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                 : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
@@ -414,7 +872,7 @@ function EditPage() {
               <p className="mt-2">{loadError}</p>
               <button
                 onClick={() => navigate('/list')}
-                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200"
               >
                 Return to Document List
               </button>
@@ -423,57 +881,100 @@ function EditPage() {
         ) : (
           <div className="flex w-full h-full">
             {/* Document Editor - Left Side */}
-            <div className="flex-1 h-full overflow-hidden">
+            <div className="flex-1 h-full overflow-hidden bg-gray-50 dark:bg-gray-900 shadow-inner">
               {viewMode === 'edit' ? (
-                <Editor
-                  height="100%"
-                  defaultLanguage="markdown"
-                  value={content}
-                  onChange={(value) => {
-                    setContent(value || '');
-                    setIsDirty(true);
-                  }}
-                  onMount={handleEditorDidMount}
-                  theme="vs-dark"
-                  options={{
-                    minimap: { enabled: false },
-                    wordWrap: 'on',
-                    lineNumbers: 'on',
-                    fontSize: 14,
-                    automaticLayout: true,
-                    scrollBeyondLastLine: false,
-                    padding: { top: 20, bottom: 20 },
-                  }}
-                />
+                <div className="h-full w-full overflow-hidden bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
+                  <style>
+                    {Object.entries(editorStyles).map(([selector, styles]) => {
+                      const cssRules = Object.entries(styles)
+                        .map(([property, value]) => `${property}: ${value};`)
+                        .join(' ');
+                      return `${selector} { ${cssRules} }`;
+                    }).join('\n')}
+                  </style>
+                  <div className="flex flex-col h-full">
+                    <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+                      <div className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                        {title || 'Untitled Document'}
+                      </div>
+                      <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400">
+                        {lastUpdatedAt && (
+                          <span>Last updated: {new Date(lastUpdatedAt).toLocaleString()}</span>
+                        )}
+                      </div>
+                    </div>
+                    <MonacoEditor
+                      value={content}
+                      onChange={handleEditorChange}
+                      theme={editorTheme}
+                      height="100%"
+                      width="100%"
+                      options={{
+                        wordWrap: 'on',
+                        minimap: { enabled: true },
+                        scrollBeyondLastLine: false,
+                        lineNumbers: 'on',
+                        renderLineHighlight: 'all',
+                        fontFamily: '"Menlo", "Monaco", "Courier New", monospace',
+                        fontSize: 14,
+                        lineHeight: 21,
+                        padding: { top: 16, bottom: 16 },
+                      }}
+                    />
+                  </div>
+                </div>
               ) : (
-                <div className="h-full overflow-auto p-6 bg-white dark:bg-gray-800">
-                  <div className="max-w-4xl mx-auto prose dark:prose-invert">
-                    <ReactMarkdown>{content || '**No content to preview**\n\nStart editing to see your document here.'}</ReactMarkdown>
+                <div className="h-full w-full overflow-hidden bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
+                  <div className="flex flex-col h-full">
+                    <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+                      <div className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                         {title || 'Untitled Document'} (Preview)
+                       </div>
+                      <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400">
+                        {lastUpdatedAt && (
+                          <span>Last updated: {new Date(lastUpdatedAt).toLocaleString()}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex-1 overflow-auto p-6">
+                      <div className="max-w-4xl mx-auto prose prose-lg dark:prose-invert prose-headings:font-semibold prose-a:text-blue-600 prose-code:text-blue-600 prose-code:bg-blue-50 dark:prose-code:bg-gray-700 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none prose-blockquote:border-l-4 prose-blockquote:border-blue-500 prose-blockquote:pl-4 prose-blockquote:italic">
+                        {content ? (
+                          <ReactMarkdown>
+                            {content}
+                          </ReactMarkdown>
+                        ) : (
+                          <div>
+                            <p><strong>No content to preview</strong></p>
+                            <p>Start editing to see your document here.</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
             </div>
 
             {/* AI Chat Section - Right Side Panel */}
-            <div className="w-1/3 min-w-[300px] max-w-[500px] h-full flex flex-col bg-gray-50 dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 resize-x overflow-hidden">
-              <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <div className="w-1/3 min-w-[300px] max-w-[500px] h-full flex flex-col bg-gray-50 dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 resize-x overflow-hidden shadow-md">
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-800 shadow-sm">
                 <h2 className="text-lg font-medium text-gray-900 dark:text-white flex items-center">
-                  <MessageSquare className="w-5 h-5 mr-2" />
+                  <MessageSquare className="w-5 h-5 mr-2 text-blue-500" />
                   AI Assistant
                 </h2>
                 <button
                   onClick={handleGeneralReview}
                   disabled={isReviewing || content.trim().length < 10}
-                  className={`px-3 py-1 text-sm font-medium rounded-md flex items-center ${
+                  className={`px-3 py-1.5 text-sm font-medium rounded-lg flex items-center transition-colors duration-200 ${
                     isReviewing || content.trim().length < 10
                       ? 'bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400 cursor-not-allowed'
-                      : 'bg-green-600 text-white hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600'
+                      : 'bg-green-600 text-white hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 shadow-sm'
                   }`}
                 >
                   {isReviewing ? (
-                    <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
+                    <RefreshCw className="w-4 h-4 mr-1.5 animate-spin" />
                   ) : (
-                    <RefreshCw className="w-4 h-4 mr-1" />
+                    <RefreshCw className="w-4 h-4 mr-1.5" />
                   )}
                   Review
                 </button>
@@ -482,9 +983,10 @@ function EditPage() {
               {/* Chat Messages */}
               <div className="flex-1 overflow-y-auto p-4">
                 {chat.length === 0 ? (
-                  <div className="text-center text-gray-500 dark:text-gray-400 h-full flex flex-col items-center justify-center">
-                    <MessageSquare className="w-8 h-8 mb-2 opacity-50" />
-                    <p>No messages yet. Ask the AI assistant for help or click "Review Document".</p>
+                  <div className="text-center text-gray-500 dark:text-gray-400 h-full flex flex-col items-center justify-center p-6 bg-white dark:bg-gray-700 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600">
+                    <MessageSquare className="w-8 h-8 mb-2 opacity-50 text-blue-500" />
+                    <p className="font-medium">No messages yet</p>
+                    <p className="text-sm mt-1">Ask the AI assistant for help or click "Review Document".</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -496,15 +998,73 @@ function EditPage() {
                         }`}
                       >
                         <div
-                          className={`max-w-3/4 rounded-lg p-3 ${
+                          className={`max-w-[85%] rounded-lg p-3 shadow-sm ${
                             msg.role === 'user'
                               ? 'bg-blue-100 text-blue-900 dark:bg-blue-900 dark:text-blue-100'
                               : msg.role === 'system'
                               ? 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 text-sm italic'
-                              : 'bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-gray-100'
+                              : 'bg-white text-gray-900 dark:bg-gray-700 dark:text-gray-100 border border-gray-200 dark:border-gray-600'
                           }`}
                         >
-                          <ReactMarkdown>{msg.text}</ReactMarkdown>
+                          {msg.role === 'assistant' && msg.text.includes('```diff') ? (
+                            <div className="prose prose-sm dark:prose-invert max-w-none">
+                              <ReactMarkdown
+                                components={{
+                                  code({ node, className, children, ...props }: React.ComponentPropsWithoutRef<'code'> & {
+                                    node?: any;
+                                    className?: string;
+                                    children?: React.ReactNode;
+                                  }) {
+                                    const match = /language-(\w+)/.exec(className || '');
+                                    const language = match ? match[1] : '';
+                                    
+                                    if (language === 'diff') {
+                                      return (
+                                        <div className="bg-gray-50 dark:bg-gray-800 rounded-md p-2 overflow-x-auto">
+                                          {String(children)
+                                            .split('\n')
+                                            .map((line, i) => {
+                                              if (line.startsWith('+ ')) {
+                                                return (
+                                                  <div key={i} className="text-green-600 dark:text-green-400 font-mono text-sm">
+                                                    {line}
+                                                  </div>
+                                                );
+                                              } else if (line.startsWith('- ')) {
+                                                return (
+                                                  <div key={i} className="text-red-600 dark:text-red-400 font-mono text-sm">
+                                                    {line}
+                                                  </div>
+                                                );
+                                              }
+                                              return (
+                                                <div key={i} className="text-gray-700 dark:text-gray-300 font-mono text-sm">
+                                                  {line}
+                                                </div>
+                                              );
+                                            })}
+                                        </div>
+                                      );
+                                    }
+                                    
+                                    return (
+                                      <code className={className} {...props}>
+                                        {children}
+                                      </code>
+                                    );
+                                  },
+                                  h3: ({ children }) => <h3 className="text-lg font-semibold text-blue-600 dark:text-blue-400 mt-2 mb-3">{children}</h3>,
+                                  h4: ({ children }) => <h4 className="text-md font-medium text-blue-500 dark:text-blue-300 mt-2 mb-2">{children}</h4>,
+                                }}
+                              >
+                                {msg.text}
+                              </ReactMarkdown>
+                            </div>
+                          ) : (
+                            <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none">
+                              {msg.text}
+                            </ReactMarkdown>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -514,7 +1074,7 @@ function EditPage() {
               </div>
 
               {/* Chat Input */}
-              <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 shadow-inner">
                 <div className="flex items-center space-x-2">
                   <input
                     type="text"
@@ -527,15 +1087,15 @@ function EditPage() {
                       }
                     }}
                     placeholder="Ask the AI assistant for help..."
-                    className="flex-1 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white transition-all duration-200 shadow-sm"
                   />
                   <button
                     onClick={handleChatSubmit}
                     disabled={chatInput.trim() === '' || isReviewing}
-                    className={`p-2 rounded-md ${
+                    className={`p-2 rounded-lg transition-colors duration-200 ${
                       chatInput.trim() === '' || isReviewing
                         ? 'bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500 cursor-not-allowed'
-                        : 'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600'
+                        : 'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 shadow-sm'
                     }`}
                   >
                     <Send className="w-5 h-5" />

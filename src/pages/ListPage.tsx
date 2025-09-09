@@ -84,12 +84,20 @@ function ListPage() {
 
   const filteredDocuments = useMemo(() => {
     const term = searchTerm.toLowerCase();
-    return documents.filter((doc) => {
+    // First filter the documents
+    const filtered = documents.filter((doc) => {
       const matchesSearch =
         doc.title.toLowerCase().includes(term) || doc.doc_type.toLowerCase().includes(term);
       const matchesType = filterType === 'all' || doc.doc_type === filterType;
       const matchesStatus = filterStatus === 'all' || doc.status === filterStatus;
       return matchesSearch && matchesType && matchesStatus;
+    });
+    
+    // Then sort by creation date (newest first)
+    return filtered.sort((a, b) => {
+      const dateA = new Date(a.created || a.created_at || 0).getTime();
+      const dateB = new Date(b.created || b.created_at || 0).getTime();
+      return dateB - dateA; // Descending order (newest first)
     });
   }, [documents, searchTerm, filterType, filterStatus]);
 

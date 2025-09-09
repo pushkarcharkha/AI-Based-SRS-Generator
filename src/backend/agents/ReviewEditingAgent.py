@@ -50,6 +50,10 @@ class ReviewEditingAgent(BaseAgent):
             )
         else:
             self.llm = MockReviewLLM()
+            
+        # Import difflib for generating detailed diffs
+        import difflib
+        self.difflib = difflib
         
         # Create prompt templates for different review types
         self.formatting_template = PromptTemplate.from_template(
@@ -137,6 +141,51 @@ class ReviewEditingAgent(BaseAgent):
         content = re.sub(r'([.!?])\s*([A-Z])', r'\1 \2', content)
         
         return content.strip()
+        
+    def _generate_diff_details(self, original_content: str, improved_content: str) -> dict:
+        """Generate detailed diff information between original and improved content"""
+        # Split content into lines for comparison
+        original_lines = original_content.split('\n')
+        improved_lines = improved_content.split('\n')
+        
+        # Generate unified diff
+        diff = list(self.difflib.unified_diff(
+            original_lines,
+            improved_lines,
+            lineterm='',
+            n=2  # Context lines
+        ))
+        
+        # Skip the header lines (first 3 lines of unified diff)
+        if len(diff) > 2:
+            diff = diff[3:]
+        
+        # Process the diff to create a more readable format
+        removed_lines = []
+        added_lines = []
+        
+        for line in diff:
+            if line.startswith('+') and not line.startswith('+++'):
+                added_lines.append(line[1:])
+            elif line.startswith('-') and not line.startswith('---'):
+                removed_lines.append(line[1:])
+        
+        # Create a summary of changes
+        changes_summary = []
+        if removed_lines and added_lines:
+            changes_summary.append("Content was revised with both removals and additions.")
+        elif removed_lines:
+            changes_summary.append("Content was streamlined with some text removed.")
+        elif added_lines:
+            changes_summary.append("Content was enhanced with additional information.")
+        
+        # Return structured diff information
+        return {
+            "removed": removed_lines,
+            "added": added_lines,
+            "summary": changes_summary,
+            "unified_diff": diff[:100] if len(diff) > 100 else diff  # Limit diff size
+        }
     
     @tenacity.retry(
         stop=tenacity.stop_after_attempt(3),
@@ -195,11 +244,15 @@ class ReviewEditingAgent(BaseAgent):
                 )
                 document_id = ingest_result.get("document_id")
             
+            # Generate detailed diff of changes
+            diff_details = self._generate_diff_details(content, final_content)
+            
             return {
                 "status": "success",
                 "document_id": document_id,
                 "improved_content": final_content,
                 "changes_made": changes_made,
+                "diff_details": diff_details,
                 "original_word_count": len(content.split()),
                 "final_word_count": len(final_content.split())
             }
