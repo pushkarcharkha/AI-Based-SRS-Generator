@@ -1,12 +1,13 @@
 import React, { useRef, useEffect, useState } from 'react';
 import Editor, { Monaco } from '@monaco-editor/react';
 import { editor } from 'monaco-editor';
+import { defineTheme } from '../utils/editorThemes';
 
 interface MonacoEditorProps {
   value: string;
   onChange: (value: string) => void;
   language?: string;
-  theme?: 'vs-dark' | 'light';
+  theme?: 'vs-dark' | 'light' | 'modern-dark' | 'modern-light';
   height?: string;
   width?: string;
   options?: editor.IStandaloneEditorConstructionOptions;
@@ -28,6 +29,9 @@ const MonacoEditor: React.FC<MonacoEditorProps> = ({
   const handleEditorDidMount = (editor: editor.IStandaloneCodeEditor, monaco: Monaco) => {
     editorRef.current = editor;
     setIsEditorReady(true);
+    
+    // Define custom themes
+    defineTheme(monaco);
     
     // Configure markdown syntax highlighting
     monaco.languages.setMonarchTokensProvider('markdown', {
@@ -90,13 +94,13 @@ const MonacoEditor: React.FC<MonacoEditorProps> = ({
   };
 
   return (
-    <div style={{ height, width, border: '1px solid #30363d', borderRadius: '6px', overflow: 'hidden' }}>
+    <div style={{ height, width, border: '1px solid #30363d', borderRadius: '6px', overflow: 'hidden', transition: 'all 0.3s ease' }}>
       <Editor
         height={height}
         width={width}
         language={language}
         value={value}
-        theme={theme}
+        theme={theme === 'vs-dark' ? 'modern-dark' : theme === 'light' ? 'modern-light' : theme}
         options={defaultOptions}
         onMount={handleEditorDidMount}
       />

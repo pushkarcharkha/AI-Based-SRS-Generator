@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Sparkles, Settings } from 'lucide-react';
+import { FileText, Sparkles, Settings, ChevronRight, Book, Layers, PenTool, Palette, Zap } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 type DocStatus = 'draft' | 'review' | 'final';
@@ -65,10 +65,13 @@ function GeneratePage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="max-w-6xl mx-auto px-4 py-8 animate-fade-in">
       <div className="mb-8">
-        <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Generate Document</h2>
-        <p className="text-gray-600 dark:text-gray-400">
+        <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4 flex items-center">
+          <Sparkles className="w-8 h-8 mr-3 text-primary-500" />
+          Generate Document
+        </h2>
+        <p className="text-gray-600 dark:text-gray-400 max-w-2xl">
           Create professional documents using AI-powered generation based on your knowledge base.
         </p>
       </div>
@@ -76,27 +79,28 @@ function GeneratePage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Form Section */}
         <div className="space-y-6">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6 flex items-center">
-              <Settings className="w-5 h-5 mr-2" />
-              Document Configuration
-            </h3>
-
-            {error && (
-              <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300 text-sm">
-                {error}
-              </div>
-            )}
-
-            <div className="space-y-4">
+          <div className="card">
+            <div className="card-header">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                <Book className="w-5 h-5 mr-2 text-primary-500" />
+                Project Information
+              </h3>
+            </div>
+            <div className="card-body space-y-5">
+              {error && (
+                <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300 text-sm">
+                  {error}
+                </div>
+              )}
+              
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="form-label">
                   Document Type
                 </label>
                 <select
                   value={formData.docType}
                   onChange={(e) => handleInputChange('docType', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className="form-select"
                 >
                   <option value="SRS">Software Requirements Specification (SRS)</option>
                   <option value="SOW">Statement of Work (SOW)</option>
@@ -107,20 +111,30 @@ function GeneratePage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="form-label">
                   Project Summary
                 </label>
-                <input
-                  type="text"
+                <textarea
                   value={formData.summary}
                   onChange={(e) => handleInputChange('summary', e.target.value)}
                   placeholder="E.g., E-commerce Platform Development"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className="form-textarea resize-vertical"
+                  rows={4}
                 />
               </div>
-
+            </div>
+          </div>
+          
+          <div className="card">
+            <div className="card-header">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                <Layers className="w-5 h-5 mr-2 text-primary-500" />
+                Requirements & Content
+              </h3>
+            </div>
+            <div className="card-body space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="form-label">
                   Requirements & Specifications
                 </label>
                 <textarea
@@ -128,24 +142,29 @@ function GeneratePage() {
                   onChange={(e) => handleInputChange('requirements', e.target.value)}
                   rows={6}
                   placeholder="Enter key requirements, features, or specifications..."
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
+                  className="form-textarea resize-vertical"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="form-label">
                   Writing Style
                 </label>
-                <select
-                  value={formData.style}
-                  onChange={(e) => handleInputChange('style', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                >
-                  <option value="professional">Professional</option>
-                  <option value="technical">Technical</option>
-                  <option value="business">Business</option>
-                  <option value="academic">Academic</option>
-                </select>
+                <div className="relative">
+                  <select
+                    value={formData.style}
+                    onChange={(e) => handleInputChange('style', e.target.value)}
+                    className="form-select pr-10"
+                  >
+                    <option value="professional">Professional</option>
+                    <option value="technical">Technical</option>
+                    <option value="business">Business</option>
+                    <option value="academic">Academic</option>
+                  </select>
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                    <Palette className="w-4 h-4 text-gray-400" />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -153,7 +172,7 @@ function GeneratePage() {
           <button
             onClick={handleGenerate}
             disabled={isGenerating || !formData.summary.trim() || !formData.requirements.trim()}
-            className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-lg font-medium hover:from-blue-700 hover:to-blue-800 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+            className="btn-primary w-full group"
           >
             {isGenerating ? (
               <>
@@ -162,7 +181,7 @@ function GeneratePage() {
               </>
             ) : (
               <>
-                <Sparkles className="w-5 h-5" />
+                <Zap className="w-5 h-5 mr-2 group-hover:animate-pulse" />
                 <span>Generate Document</span>
               </>
             )}
@@ -171,50 +190,70 @@ function GeneratePage() {
 
         {/* Preview Section */}
         <div className="space-y-6">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+          <div className="card overflow-hidden">
+            <div className="card-header bg-gray-50 dark:bg-gray-800">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-                <FileText className="w-5 h-5 mr-2" />
+                <FileText className="w-5 h-5 mr-2 text-primary-500" />
                 Document Preview
               </h3>
               {generatedContent && (
                 <button
                   onClick={() => setShowPreview((s) => !s)}
-                  className="text-sm px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300"
+                  className="btn-secondary text-sm px-3 py-1.5"
                 >
                   {showPreview ? 'Hide' : 'Show'} Preview
                 </button>
               )}
             </div>
 
-            <div className="p-6">
+            <div className="p-6 bg-white dark:bg-gray-800 min-h-[400px] max-h-[600px] overflow-auto">
               {!generatedContent ? (
-                <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                  <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>Generate a document to see the preview</p>
+                <div className="flex flex-col items-center justify-center h-full py-12 text-gray-500 dark:text-gray-400">
+                  <div className="w-24 h-24 mb-6 relative">
+                    <div className="absolute inset-0 bg-gray-100 dark:bg-gray-700 rounded-lg transform rotate-3"></div>
+                    <div className="absolute inset-0 bg-gray-200 dark:bg-gray-600 rounded-lg transform -rotate-3"></div>
+                    <div className="absolute inset-0 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 flex items-center justify-center">
+                      <FileText className="w-12 h-12 text-gray-400" />
+                    </div>
+                  </div>
+                  <p className="text-lg font-medium">No Document Generated Yet</p>
+                  <p className="text-sm mt-2 max-w-xs text-center">Fill out the form and click "Generate Document" to create your document</p>
                 </div>
               ) : showPreview ? (
-                <div className="prose prose-sm max-w-none dark:prose-invert">
+                <div className="prose prose-sm max-w-none dark:prose-invert animate-fade-in">
                   <ReactMarkdown>{generatedContent}</ReactMarkdown>
                 </div>
               ) : (
-                <div className="text-sm text-gray-500 dark:text-gray-400">Preview hidden</div>
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center text-gray-500 dark:text-gray-400">
+                    <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>Preview hidden</p>
+                    <button 
+                      onClick={() => setShowPreview(true)}
+                      className="mt-4 text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 font-medium"
+                    >
+                      Show Preview
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           </div>
 
           {generatedContent && (
-            <div className="flex space-x-3">
+            <div className="flex flex-col sm:flex-row gap-3 animate-slide-up">
               <button
                 onClick={goToEdit}
-                className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition-colors"
+                className="btn-primary flex-1 py-3"
               >
+                <FileText className="w-5 h-5 mr-2" />
                 Save Draft
               </button>
               <button
                 onClick={goToEdit}
-                className="flex-1 bg-gray-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-700 transition-colors"
+                className="btn-secondary flex-1 py-3"
               >
+                <PenTool className="w-5 h-5 mr-2" />
                 Edit Document
               </button>
             </div>

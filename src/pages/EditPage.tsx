@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Save, MessageSquare, RefreshCw, Send, Eye, Edit3 } from 'lucide-react';
+import { Save, MessageSquare, RefreshCw, Send, Eye, Edit3, Columns, LayoutGrid, Maximize2, Minimize2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 // Monaco Editor import
 import MonacoEditor from '../components/MonacoEditor';
 
 type DocStatus = 'draft' | 'review' | 'final';
-type ViewMode = 'edit' | 'preview';
+type ViewMode = 'edit' | 'preview' | 'split';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
@@ -381,6 +381,7 @@ function EditPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('edit');
   const [isDirty, setIsDirty] = useState<boolean>(false);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string>('');
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
   // Handle content changes from Monaco Editor
   const handleEditorChange = (newContent: string) => {
@@ -739,11 +740,11 @@ function EditPage() {
       <div className="min-h-screen flex flex-col">
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Review & Edit Document</h2>
-            <p className="text-gray-600 dark:text-gray-400">Loading document...</p>
-            <div className="mt-6">
-              <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-lg h-64 w-full max-w-2xl mx-auto" />
-            </div>
+              <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4 transition-colors duration-300">Review & Edit Document</h2>
+              <p className="text-gray-600 dark:text-gray-400 transition-colors duration-300">Loading document...</p>
+              <div className="mt-6">
+                <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-lg h-64 w-full max-w-2xl mx-auto transition-all duration-300" />
+              </div>
           </div>
         </div>
       </div>
@@ -793,13 +794,13 @@ function EditPage() {
           <div className="flex items-center space-x-4">
             <button
               onClick={() => navigate('/list')}
-              className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors duration-200 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+              className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-all duration-200 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 hover:shadow-sm transform hover:-translate-x-0.5"
               aria-label="Back to List"
             >
               ← Back to List
             </button>
             <div>
-              <h1 className="text-xl font-semibold text-gray-900 dark:text-white truncate max-w-md">{title || 'Untitled Document'}</h1>
+              <h1 className="text-xl font-semibold text-gray-900 dark:text-white truncate max-w-md transition-colors duration-300">{title || 'Untitled Document'}</h1>
               {lastUpdatedAt && (
                 <span className="text-xs text-gray-500 dark:text-gray-400">
                   Last saved: {new Date(lastUpdatedAt).toLocaleString()}
@@ -821,6 +822,17 @@ function EditPage() {
                 Edit
               </button>
               <button
+                onClick={() => setViewMode('split')}
+                className={`px-3 py-1.5 text-sm font-medium transition-colors duration-200 ${
+                  viewMode === 'split'
+                    ? 'bg-blue-500 text-white'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                <Columns className="w-4 h-4 inline mr-1" />
+                Split
+              </button>
+              <button
                 onClick={() => setViewMode('preview')}
                 className={`px-3 py-1.5 text-sm font-medium transition-colors duration-200 ${
                   viewMode === 'preview'
@@ -833,12 +845,22 @@ function EditPage() {
               </button>
             </div>
             <button
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className="p-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 hover:shadow-sm transform hover:scale-110"
+              title={isFullscreen ? "Exit fullscreen" : "Fullscreen mode"}
+            >
+              {isFullscreen ? 
+                <Minimize2 className="w-4 h-4" /> : 
+                <Maximize2 className="w-4 h-4" />
+              }
+            </button>
+            <button
               onClick={handleSave}
               disabled={isSaving || !isDirty}
-              className={`px-3 py-1.5 text-sm font-medium rounded-lg flex items-center shadow-sm transition-colors duration-200 ${
+              className={`px-3 py-1.5 text-sm font-medium rounded-lg flex items-center shadow-sm transition-all duration-200 ${
                 isSaving || !isDirty
                   ? 'bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400 cursor-not-allowed'
-                  : 'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600'
+                  : 'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 hover:shadow-md transform hover:-translate-y-0.5'
               }`}
             >
               {isSaving ? <RefreshCw className="w-4 h-4 mr-1 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
@@ -872,17 +894,17 @@ function EditPage() {
               <p className="mt-2">{loadError}</p>
               <button
                 onClick={() => navigate('/list')}
-                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200"
+                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-all duration-200 hover:shadow-md transform hover:-translate-y-0.5"
               >
                 Return to Document List
               </button>
             </div>
           </div>
         ) : (
-          <div className="flex w-full h-full">
+          <div className={`flex w-full h-full ${isFullscreen ? 'fixed inset-0 z-50 bg-white dark:bg-gray-900' : ''}`}>
             {/* Document Editor - Left Side */}
-            <div className="flex-1 h-full overflow-hidden bg-gray-50 dark:bg-gray-900 shadow-inner">
-              {viewMode === 'edit' ? (
+            <div className={`${viewMode === 'split' ? 'w-1/2' : 'flex-1'} h-full overflow-hidden bg-gray-50 dark:bg-gray-900 shadow-inner transition-all duration-300 ${viewMode === 'split' ? 'animate-fadeIn' : ''}`}>
+              {viewMode === 'edit' || viewMode === 'split' ? (
                 <div className="h-full w-full overflow-hidden bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
                   <style>
                     {Object.entries(editorStyles).map(([selector, styles]) => {
@@ -923,7 +945,12 @@ function EditPage() {
                     />
                   </div>
                 </div>
-              ) : (
+              ) : null}
+            </div>
+            
+            {/* Preview - Right Side or Full */}
+            {viewMode === 'preview' || viewMode === 'split' ? (
+              <div className={`${viewMode === 'split' ? 'w-1/2' : 'flex-1'} h-full overflow-hidden bg-gray-50 dark:bg-gray-900 shadow-inner transition-all duration-300 ${viewMode === 'split' ? 'animate-fadeIn' : ''}`}>
                 <div className="h-full w-full overflow-hidden bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
                   <div className="flex flex-col h-full">
                     <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
@@ -937,7 +964,7 @@ function EditPage() {
                       </div>
                     </div>
                     <div className="flex-1 overflow-auto p-6">
-                      <div className="max-w-4xl mx-auto prose prose-lg dark:prose-invert prose-headings:font-semibold prose-a:text-blue-600 prose-code:text-blue-600 prose-code:bg-blue-50 dark:prose-code:bg-gray-700 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none prose-blockquote:border-l-4 prose-blockquote:border-blue-500 prose-blockquote:pl-4 prose-blockquote:italic">
+                      <div className="max-w-4xl mx-auto prose prose-lg dark:prose-invert prose-headings:font-semibold prose-a:text-blue-600 hover:prose-a:text-blue-700 prose-a:transition-colors prose-code:text-blue-600 prose-code:bg-blue-50 dark:prose-code:bg-gray-700 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none prose-blockquote:border-l-4 prose-blockquote:border-blue-500 prose-blockquote:pl-4 prose-blockquote:italic transition-all duration-300">
                         {content ? (
                           <ReactMarkdown>
                             {content}
@@ -952,11 +979,11 @@ function EditPage() {
                     </div>
                   </div>
                 </div>
-              )}
-            </div>
-
+              </div>
+            ) : null}
+            
             {/* AI Chat Section - Right Side Panel */}
-            <div className="w-1/3 min-w-[300px] max-w-[500px] h-full flex flex-col bg-gray-50 dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 resize-x overflow-hidden shadow-md">
+            <div className={`${isFullscreen ? 'hidden' : 'w-1/3 min-w-[300px] max-w-[500px]'} h-full flex flex-col bg-gray-50 dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 resize-x overflow-hidden shadow-md transition-all duration-300 ${isFullscreen ? '' : 'animate-slideInRight'}`}>
               <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-800 shadow-sm">
                 <h2 className="text-lg font-medium text-gray-900 dark:text-white flex items-center">
                   <MessageSquare className="w-5 h-5 mr-2 text-blue-500" />
@@ -965,10 +992,10 @@ function EditPage() {
                 <button
                   onClick={handleGeneralReview}
                   disabled={isReviewing || content.trim().length < 10}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-lg flex items-center transition-colors duration-200 ${
+                  className={`px-3 py-1.5 text-sm font-medium rounded-lg flex items-center transition-all duration-200 ${
                     isReviewing || content.trim().length < 10
                       ? 'bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400 cursor-not-allowed'
-                      : 'bg-green-600 text-white hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 shadow-sm'
+                      : 'bg-green-600 text-white hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 shadow-sm hover:shadow-md transform hover:-translate-y-0.5'
                   }`}
                 >
                   {isReviewing ? (
@@ -983,7 +1010,7 @@ function EditPage() {
               {/* Chat Messages */}
               <div className="flex-1 overflow-y-auto p-4">
                 {chat.length === 0 ? (
-                  <div className="text-center text-gray-500 dark:text-gray-400 h-full flex flex-col items-center justify-center p-6 bg-white dark:bg-gray-700 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600">
+                  <div className="text-center text-gray-500 dark:text-gray-400 h-full flex flex-col items-center justify-center p-6 bg-white dark:bg-gray-700 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600 transition-all duration-300 animate-fadeIn">
                     <MessageSquare className="w-8 h-8 mb-2 opacity-50 text-blue-500" />
                     <p className="font-medium">No messages yet</p>
                     <p className="text-sm mt-1">Ask the AI assistant for help or click "Review Document".</p>
@@ -998,12 +1025,12 @@ function EditPage() {
                         }`}
                       >
                         <div
-                          className={`max-w-[85%] rounded-lg p-3 shadow-sm ${
+                          className={`max-w-[85%] rounded-lg p-3 shadow-sm transition-all duration-300 animate-fadeIn ${
                             msg.role === 'user'
-                              ? 'bg-blue-100 text-blue-900 dark:bg-blue-900 dark:text-blue-100'
+                              ? 'bg-blue-100 text-blue-900 dark:bg-blue-900 dark:text-blue-100 hover:shadow-md'
                               : msg.role === 'system'
                               ? 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 text-sm italic'
-                              : 'bg-white text-gray-900 dark:bg-gray-700 dark:text-gray-100 border border-gray-200 dark:border-gray-600'
+                              : 'bg-white text-gray-900 dark:bg-gray-700 dark:text-gray-100 border border-gray-200 dark:border-gray-600 hover:shadow-md'
                           }`}
                         >
                           {msg.role === 'assistant' && msg.text.includes('```diff') ? (
@@ -1020,25 +1047,26 @@ function EditPage() {
                                     
                                     if (language === 'diff') {
                                       return (
-                                        <div className="bg-gray-50 dark:bg-gray-800 rounded-md p-2 overflow-x-auto">
+                                        <div className="bg-gray-50 dark:bg-gray-800 rounded-md p-3 overflow-x-auto border border-gray-200 dark:border-gray-700 shadow-sm">
+                                          <div className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Changes:</div>
                                           {String(children)
                                             .split('\n')
                                             .map((line, i) => {
                                               if (line.startsWith('+ ')) {
                                                 return (
-                                                  <div key={i} className="text-green-600 dark:text-green-400 font-mono text-sm">
+                                                  <div key={i} className="text-green-600 dark:text-green-400 font-mono text-sm py-0.5 px-1 bg-green-50 dark:bg-green-900/20 rounded">
                                                     {line}
                                                   </div>
                                                 );
                                               } else if (line.startsWith('- ')) {
                                                 return (
-                                                  <div key={i} className="text-red-600 dark:text-red-400 font-mono text-sm">
+                                                  <div key={i} className="text-red-600 dark:text-red-400 font-mono text-sm py-0.5 px-1 bg-red-50 dark:bg-red-900/20 rounded">
                                                     {line}
                                                   </div>
                                                 );
                                               }
                                               return (
-                                                <div key={i} className="text-gray-700 dark:text-gray-300 font-mono text-sm">
+                                                <div key={i} className="text-gray-700 dark:text-gray-300 font-mono text-sm py-0.5">
                                                   {line}
                                                 </div>
                                               );
@@ -1053,15 +1081,47 @@ function EditPage() {
                                       </code>
                                     );
                                   },
-                                  h3: ({ children }) => <h3 className="text-lg font-semibold text-blue-600 dark:text-blue-400 mt-2 mb-3">{children}</h3>,
+                                  h3: ({ children }) => <h3 className="text-lg font-semibold text-blue-600 dark:text-blue-400 mt-2 mb-3 border-b border-blue-100 dark:border-blue-900 pb-1">{children}</h3>,
                                   h4: ({ children }) => <h4 className="text-md font-medium text-blue-500 dark:text-blue-300 mt-2 mb-2">{children}</h4>,
+                                  p: ({ children }) => {
+                                    const text = String(children);
+                                    // Check if this paragraph contains text that looks like it's describing changes
+                                    if (text.includes('removed') || text.includes('added') || text.includes('changed')) {
+                                      // Process the text to highlight changes
+                                      const processedText = text
+                                        .replace(/removed ([^.,;]+)/g, 'removed <span class="text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-1 rounded">$1</span>')
+                                        .replace(/added ([^.,;]+)/g, 'added <span class="text-green-500 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-1 rounded">$1</span>')
+                                        .replace(/changed ([^.,;]+) to ([^.,;]+)/g, 'changed <span class="text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-1 rounded">$1</span> to <span class="text-green-500 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-1 rounded">$2</span>');
+                                      
+                                      return <p className="my-2" dangerouslySetInnerHTML={{ __html: processedText }} />;
+                                    }
+                                    return <p className="my-2">{children}</p>;
+                                  },
                                 }}
                               >
                                 {msg.text}
                               </ReactMarkdown>
                             </div>
                           ) : (
-                            <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none">
+                            <ReactMarkdown 
+                              className="prose prose-sm dark:prose-invert max-w-none"
+                              components={{
+                                p: ({ children }) => {
+                                  const text = String(children);
+                                  // Check if this paragraph contains text that looks like it's describing changes
+                                  if (text.includes('removed') || text.includes('added') || text.includes('changed')) {
+                                    // Process the text to highlight changes
+                                    const processedText = text
+                                      .replace(/removed ([^.,;]+)/g, 'removed <span class="text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-1 rounded">$1</span>')
+                                      .replace(/added ([^.,;]+)/g, 'added <span class="text-green-500 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-1 rounded">$1</span>')
+                                      .replace(/changed ([^.,;]+) to ([^.,;]+)/g, 'changed <span class="text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-1 rounded">$1</span> to <span class="text-green-500 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-1 rounded">$2</span>');
+                                    
+                                    return <p className="my-2" dangerouslySetInnerHTML={{ __html: processedText }} />;
+                                  }
+                                  return <p className="my-2">{children}</p>;
+                                },
+                              }}
+                            >
                               {msg.text}
                             </ReactMarkdown>
                           )}
@@ -1087,15 +1147,15 @@ function EditPage() {
                       }
                     }}
                     placeholder="Ask the AI assistant for help..."
-                    className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white transition-all duration-200 shadow-sm"
+                    className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white transition-all duration-200 shadow-sm hover:border-blue-300 dark:hover:border-blue-500"
                   />
                   <button
                     onClick={handleChatSubmit}
                     disabled={chatInput.trim() === '' || isReviewing}
-                    className={`p-2 rounded-lg transition-colors duration-200 ${
+                    className={`p-2 rounded-lg transition-all duration-200 ${
                       chatInput.trim() === '' || isReviewing
                         ? 'bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500 cursor-not-allowed'
-                        : 'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 shadow-sm'
+                        : 'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 shadow-sm hover:shadow-md transform hover:-translate-y-0.5'
                     }`}
                   >
                     <Send className="w-5 h-5" />
