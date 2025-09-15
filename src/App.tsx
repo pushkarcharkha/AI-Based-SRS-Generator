@@ -1,10 +1,11 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { FileText, Upload, Edit3, List} from 'lucide-react';
+import { FileText, Upload, Edit3, List } from 'lucide-react';
 import UploadPage from './pages/UploadPage';
 import GeneratePage from './pages/GeneratePage';
 import EditPage from './pages/EditPage';
 import ListPage from './pages/ListPage';
+// OCR functionality integrated into UploadPage
 
 function App() {
   return (

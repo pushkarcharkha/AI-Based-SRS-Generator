@@ -243,6 +243,82 @@ class DocGenerationAgent(BaseAgent):
             fallback_content = self._create_fallback_document(summary, requirements, state.get("doc_type", "SRS"))
             state.update({"generated_content": fallback_content})
             return {"generated_content": fallback_content}
+            
+    async def stream_generate_draft(self, state: GraphState):
+        """Generate initial document draft with streaming output"""
+        logger.info("Starting streaming document generation")
+        
+        # Validate inputs
+        summary = state.get("summary", "").strip()
+        requirements = state.get("requirements", "").strip()
+        
+        if not summary and not requirements:
+            error_msg = "No input provided for document generation"
+            logger.error(error_msg)
+            yield f"# Error\n\n{error_msg}"
+            return
+        
+        try:
+            # Format inputs for prompt
+            context_text = self._format_context(state.get("context", []))
+            style_text = self._format_style_profile(state.get("style_profile", {}))
+            
+            prompt_data = {
+                "summary": summary or "Not provided",
+                "requirements": requirements or "Not specified",
+                "style_profile": style_text,
+                "context": context_text
+            }
+            
+            logger.info(f"Streaming document with prompt data keys: {list(prompt_data.keys())}")
+            formatted_prompt = self.srs_template.format(**prompt_data)
+            
+            # Use streaming capabilities if available
+            generated_content = ""
+            if hasattr(self.llm, 'astream') and callable(getattr(self.llm, 'astream')):
+                # For LLMs that support streaming
+                async for chunk in self.llm.astream(formatted_prompt):
+                    content_piece = ""
+                    if hasattr(chunk, 'content'):
+                        content_piece = chunk.content
+                    elif isinstance(chunk, dict) and 'content' in chunk:
+                        content_piece = chunk['content']
+                    elif isinstance(chunk, str):
+                        content_piece = chunk
+                    else:
+                        content_piece = str(chunk)
+                    
+                    # Add to the complete content
+                    generated_content += content_piece
+                    # Yield each chunk for streaming
+                    yield content_piece
+            else:
+                # Fallback for LLMs without streaming - simulate streaming with chunks
+                if hasattr(self.llm, 'ainvoke'):
+                    response = await self.llm.ainvoke(formatted_prompt)
+                    if hasattr(response, 'content'):
+                        generated_content = response.content
+                    elif isinstance(response, dict):
+                        generated_content = response.get('content', str(response))
+                    else:
+                        generated_content = str(response)
+                else:
+                    generated_content = self.generation_chain.invoke(prompt_data)
+                
+                # Simulate streaming by yielding chunks
+                chunk_size = 50  # Increased chunk size for better readability
+                for i in range(0, len(generated_content), chunk_size):
+                    yield generated_content[i:i+chunk_size]
+                    await asyncio.sleep(0.02)  # Faster streaming for better UX
+            
+            # Store the complete content in the state
+            state.update({"generated_content": generated_content})
+            
+        except Exception as e:
+            logger.error(f"Streaming document generation failed: {e}")
+            fallback_content = self._create_fallback_document(summary, requirements, state.get("doc_type", "SRS"))
+            yield fallback_content
+            state.update({"generated_content": fallback_content})
     
     def _create_fallback_document(self, summary: str, requirements: str, doc_type: str) -> str:
         """Create a basic fallback document when generation fails"""

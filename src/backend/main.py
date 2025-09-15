@@ -21,6 +21,9 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 from io import BytesIO
 
+# Import OCR processor
+from .ocr_processor import process_image
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -189,6 +192,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.post("/api/multimodal")
+async def multimodal_upload(file: UploadFile = File(...)):
+    """
+    Process multimodal uploads (images) using EasyOCR.
+    Returns extracted text from images.
+    """
+    if not file:
+        raise HTTPException(status_code=400, detail="No file provided")
+    
+    # Process the image using EasyOCR
+    result = await process_image(file)
+    
+    if not result.get("success"):
+        logger.error(f"Error processing file: {result.get('error')}")
+        raise HTTPException(status_code=500, detail=result.get("error", "Unknown error"))
+    
+    return result
 
 # Initialize database and validate
 create_tables()
@@ -534,7 +555,85 @@ async def generate_document(request: DocumentGenerationRequest, db: Session = De
             updated_at=document.updated_at.isoformat(),
             feedback_score=document.feedback_score
         )
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"Document generation failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/generate/stream")
+async def generate_document_stream(request: DocumentGenerationRequest, db: Session = Depends(get_db)):
+    """Generate a document with streaming response."""
+    try:
+        # Create a document ID upfront
+        doc_id = str(uuid.uuid4())
         
+        # Import DocGenerationAgent here to avoid circular imports
+        from backend.agents.DocGenerationAgent import DocGenerationAgent
+        
+        async def content_generator():
+            try:
+                # Initial response with document ID
+                yield json.dumps({"type": "start", "id": doc_id}) + "\n"
+                
+                # Initialize the document generation agent
+                doc_agent = DocGenerationAgent()
+                
+                # Create state for document generation
+                state = {
+                    "doc_type": request.doc_type,
+                    "summary": request.summary,
+                    "requirements": request.requirements,
+                    "style_profile": {"style": request.style or "professional"}
+                }
+                
+                # Collect the full content for saving to DB
+                full_content = ""
+                
+                # Stream the document generation
+                async for content_chunk in doc_agent.stream_generate_draft(state):
+                    # Add to full content
+                    full_content += content_chunk
+                    # Ensure each chunk is flushed immediately
+                    yield json.dumps({"type": "content", "content": content_chunk}) + "\n"
+                    # Force flush the response
+                    await asyncio.sleep(0)
+                    
+                # Create document record with the collected content
+                document = DBDocument(
+                    id=doc_id,
+                    title=f"{request.doc_type}: {request.summary}",
+                    filename=f"{request.doc_type}_{uuid.uuid4().hex}.md",
+                    doc_type=request.doc_type,
+                    content=full_content,  # Use the collected content
+                    status="final",
+                    approved=True,
+                    feedback_score=max(1, min(5, request.feedback_score or 3))
+                )
+                db.add(document)
+                db.commit()
+                db.refresh(document)
+                
+                # Final response with document ID
+                yield json.dumps({
+                    "type": "complete", 
+                    "id": str(document.id),
+                    "title": document.title
+                }) + "\n"
+                  
+            except Exception as e:
+                # Error response
+                yield json.dumps({"type": "error", "message": str(e)}) + "\n"
+                logger.error(f"Streaming document generation failed: {e}")
+                  
+        # Set a smaller chunk size for the StreamingResponse to ensure timely delivery
+        return StreamingResponse(
+            content_generator(), 
+            media_type="application/x-ndjson",  # Changed to ndjson for better streaming support
+            headers={"X-Content-Type-Options": "nosniff"}  # Prevent content type sniffing
+        )
+            
     except Exception as e:
         logger.error(f"Generation failed: {e}")
         raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")

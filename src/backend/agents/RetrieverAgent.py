@@ -1,10 +1,19 @@
-"""Retriever Agent - Production-ready implementation for retrieving past SRS docs with RLHF integration"""
+"""Retriever Agent - Advanced implementation for retrieving past SRS docs with LangChain integrations"""
 
 from typing import Dict, Any, List, Optional
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import tenacity
 import logging
+import os
+
+# LangChain imports
+from langchain_groq import ChatGroq
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_pinecone import PineconeVectorStore
+from langchain.chains import RetrievalQA
+from langchain.prompts import PromptTemplate
+from langchain.schema import Document
 
 from .base_agent import BaseAgent
 from ..vector_store import VectorStoreWrapper
@@ -12,45 +21,129 @@ from ..config import settings
 
 logger = logging.getLogger(__name__)
 
-class MockRetrieverLLM:
-    """Mock LLM for query expansion when API keys are not available"""
-    
-    def invoke(self, prompt: str) -> str:
-        # Simple query expansion
-        base_query = prompt.split("Generate")[-1].strip()
-        variations = [
-            f"What are the {base_query}?",
-            f"Explain {base_query} in detail",
-            f"Requirements for {base_query}"
-        ]
-        return "\n".join(variations[:3])
-
 class RetrieverAgent(BaseAgent):
-    """Production-ready Retriever Agent with Pinecone/FAISS integration and RLHF"""
+    """Advanced Retriever Agent with LangChain integrations for Pinecone, Groq, and Hugging Face"""
     
     def __init__(self):
-        super().__init__(name="retriever", description="Retrieves past SRS docs from Pinecone/FAISS with RLHF integration")
-        self.vector_store = VectorStoreWrapper()
+        super().__init__(name="retriever", description="Retrieves past SRS docs using LangChain integrations")
         self.executor = ThreadPoolExecutor(max_workers=4)
+        
+        # Initialize embeddings model from Hugging Face
+        self.embeddings = HuggingFaceEmbeddings(
+            model_name="sentence-transformers/all-MiniLM-L6-v2"
+        )
+        
+        # Initialize Pinecone vector store if API key is available
+        if os.environ.get("PINECONE_API_KEY"):
+            self.vector_store = PineconeVectorStore(
+                index_name=settings.pinecone_index_name,
+                embedding=self.embeddings,
+                namespace=settings.pinecone_namespace or "default"
+            )
+        else:
+            # Fallback to local vector store
+            self.vector_store = VectorStoreWrapper()
+        
+        # Initialize Groq LLM if API key is available
+        if os.environ.get("GROQ_API_KEY"):
+            self.llm = ChatGroq(
+                model_name="llama3-70b-8192",
+                temperature=0.2,
+                groq_api_key=os.environ.get("GROQ_API_KEY")
+            )
+        else:
+            # Fallback to local LLM or mock
+            self.llm = None
     
-    def _create_pinecone_filter(self, doc_type: Optional[str], min_feedback_score: Optional[int]) -> Dict[str, Any]:
+    def _create_pinecone_filter(self, doc_type: Optional[str], min_score: Optional[int] = None) -> Dict[str, Any]:
         """Create filter dictionary for Pinecone queries"""
         filter_dict = {}
         
         if doc_type:
-            # Pinecone requires metadata field prefixing
             filter_dict["doc_type"] = {"$eq": doc_type}
         
-        if min_feedback_score is not None:
-            filter_dict["feedback_score"] = {"$gte": min_feedback_score}
+        if min_score is not None:
+            filter_dict["quality_score"] = {"$gte": min_score}
         
         return filter_dict
     
-    def _create_faiss_filter(self, doc_type: Optional[str], min_feedback_score: Optional[int]) -> Dict[str, Any]:
-        """Create filter dictionary for FAISS queries"""
-        filter_dict = {}
+    def _create_retrieval_chain(self, query: str, filter_dict: Dict[str, Any] = None) -> RetrievalQA:
+        """Create a LangChain retrieval chain with the configured vector store and LLM"""
+        # Create retriever with metadata filters
+        retriever = self.vector_store.as_retriever(
+            search_kwargs={"filter": filter_dict, "k": 5}
+        )
         
-        if doc_type:
+        # Define prompt template for the retrieval chain
+        template = """
+        You are an AI assistant specialized in software requirements specifications (SRS).
+        Use the following retrieved documents to answer the question.
+        
+        Question: {question}
+        
+        Retrieved documents:
+        {context}
+        
+        Answer:
+        """
+        
+        prompt = PromptTemplate(
+            template=template,
+            input_variables=["question", "context"]
+        )
+        
+        # Create the retrieval chain
+        if self.llm:
+            # Use Groq LLM if available
+            chain = RetrievalQA.from_chain_type(
+                llm=self.llm,
+                chain_type="stuff",
+                retriever=retriever,
+                chain_type_kwargs={"prompt": prompt}
+            )
+        else:
+            # Return just the retriever results if no LLM is available
+            return retriever
+            
+        return chain
+    
+    async def retrieve_documents(self, query: str, doc_type: Optional[str] = None, min_score: Optional[int] = None) -> List[Dict]:
+        """Retrieve relevant documents using LangChain integrations"""
+        # Create filter for the query
+        filter_dict = self._create_pinecone_filter(doc_type, min_score)
+        
+        # Get retriever or chain
+        retrieval_chain = self._create_retrieval_chain(query, filter_dict)
+        
+        if isinstance(retrieval_chain, RetrievalQA):
+            # Use the chain if LLM is available
+            result = retrieval_chain.invoke({"query": query})
+            return result
+        else:
+            # Just use the retriever if no LLM
+            docs = retrieval_chain.get_relevant_documents(query)
+            return [doc.metadata for doc in docs]
+            
+    async def process_query(self, query: str, **kwargs) -> Dict[str, Any]:
+        """Process a query and return relevant documents with LangChain"""
+        try:
+            results = await self.retrieve_documents(
+                query=query,
+                doc_type=kwargs.get("doc_type"),
+                min_score=kwargs.get("min_score")
+            )
+            return {
+                "status": "success",
+                "results": results,
+                "query": query
+            }
+        except Exception as e:
+            logger.error(f"Error in retriever agent: {str(e)}")
+            return {
+                "status": "error",
+                "message": str(e),
+                "query": query
+            }
             filter_dict["doc_type"] = doc_type
         
         if min_feedback_score is not None:
